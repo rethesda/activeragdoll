@@ -1500,11 +1500,17 @@ int GetNumSmoothingFrames(float smoothingTime)
 
 NiPointer<NiAVObject> GetWeaponNode(bool isLeft, bool thirdPerson)
 {
+    PlayerCharacter *player = *g_thePlayer;
+    if (!player) return nullptr;
+
+    NiPointer<NiAVObject> rootNode = player->GetNiRootNode(!thirdPerson);
+    if (!rootNode) return nullptr;
+
     static BSFixedString weaponNodeName("WEAPON");
     static BSFixedString shieldNodeName("SHIELD");
     bool useLeft = *g_leftHandedMode != isLeft;
     BSFixedString &handWeaponNodeName = useLeft ? shieldNodeName : weaponNodeName;
-    return (*g_thePlayer)->GetNiRootNode(!thirdPerson)->GetObjectByName(&handWeaponNodeName.data);
+    return rootNode->GetObjectByName(&handWeaponNodeName.data);
 }
 
 BSFlattenedBoneTree * GetParentBoneTree(NiAVObject *node)

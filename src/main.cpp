@@ -1,4 +1,5 @@
 ﻿#include <functional>
+#include <atomic>
 #include <string>
 #include <regex>
 #include <limits>
@@ -921,6 +922,25 @@ GrabbedActorAction GetDesiredGrabbedActorAction(Actor *actor, bool isHeld)
     }
 
     return GrabbedActorAction::None;
+}
+
+
+std::atomic<float> g_desiredMeleeAlphas[2]{ 1.f, 1.f };
+
+void UpdateMeleeAlpha()
+{
+    for (int isLeft = 0; isLeft < 2; ++isLeft) {
+        float alpha = g_desiredMeleeAlphas[isLeft];
+        if (NiPointer<NiAVObject> weaponNode = GetWeaponNode(isLeft, g_isVrikPresent)) {
+            // TODO: Blood on the weapon does not react to alpha.
+            // Re: Bound weapons, or other weapons with existing alpha
+            //     - Should be fine because those have alpha handled at the geometry level, not fade node
+            if (BSFadeNode *fadeNode = DYNAMIC_CAST(weaponNode, NiAVObject, BSFadeNode)) {
+                NiAVObject_SetFadeNodeRecurse(weaponNode, fadeNode);
+                BSFadeNode_SetCurrentFade(fadeNode, alpha);
+            }
+        }
+    }
 }
 
 
@@ -2456,17 +2476,7 @@ struct PhysicsListener :
                 std::scoped_lock lock(collisionCooldownTargetsLock);
                 fade = !collisionCooldownTargets[isLeft].empty();
             }
-            float alpha = fade ? Config::options.playerMeleeCollisionDisabledWeaponAlpha : 1.f;
-            if (NiPointer<NiAVObject> weaponNode = GetWeaponNode(isLeft, g_isVrikPresent)) {
-                // TODO: Blood on the weapon does not react to alpha.
-                // TODO: Bound weapons? Or other weapons with existing alpha
-                //       - Should be fine because those have alpha handled at the geometry level, not fade node
-                // TODO: Probably need to put this in a more safe func
-                if (BSFadeNode *fadeNode = DYNAMIC_CAST(weaponNode, NiAVObject, BSFadeNode)) {
-                    NiAVObject_SetFadeNodeRecurse(weaponNode, fadeNode);
-                    BSFadeNode_SetCurrentFade(fadeNode, alpha);
-                }
-            }
+            g_desiredMeleeAlphas[isLeft] = fade ? Config::options.playerMeleeCollisionDisabledWeaponAlpha : 1.f;
         }
     }
 
@@ -4563,6 +4573,8 @@ void ProcessHavokHitJobsHook(HavokHitJobs *havokHitJobs)
 
     // Do this after we've updated higgs things
     UpdateSpeedReductionAndStaminaDrain();
+
+    UpdateMeleeAlpha();
 
     RunDelayedJobs(g_currentFrameTime);
 
